@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            position: relative;
+        }
+        canvas {
+            border: 2px solid #333;
+            background-color: #fff;
+        }
+        #score {
+            font-size: 24px;
+            margin: 10px 0;
+        }
+        #timer {
+            font-size: 24px;
+            margin: 10px 0;
+        }
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #imageTopLeft {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 150px;
+            height: auto;
+        }
+        #imageBottomRight {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 150px;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <img id="imageTopLeft" src="1.jpg" alt="Top Left Image">
+    <div id="score">Score: 0</div>
+    <div id="timer">Time: 0s</div>
+    <canvas id="gameCanvas" width="600" height="600"></canvas>
+    <div id="gameOver">
+        <h2>Game Over</h2>
+        <p>Your Score: <span id="finalScore"></span></p>
+        <p>Time Played: <span id="finalTime"></span></p>
+        <button onclick="restartGame()">Restart</button>
+    </div>
+    <img id="imageBottomRight" src="2.jpg" alt="Bottom Right Image">
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const timerDisplay = document.getElementById('timer');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const finalTimeDisplay = document.getElementById('finalTime');
+
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+        let snake = [{ x: 15, y: 15 }];
+        let food = { x: 20, y: 20 };
+        let obstacles = [];
+        let dx = 0;
+        let dy = 0;
+        let score = 0;
+        let speed = 200;
+        let obstacleCount = 3;
+        let gameLoop;
+        let startTime;
+        let timerInterval;
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                timerDisplay.textContent = `Time: ${elapsed}s`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            return elapsed;
+        }
+
+        function generateObstacles(count) {
+            obstacles = [];
+            for (let i = 0; i < count; i++) {
+                let obstacle;
+                do {
+                    obstacle = {
+                        x: Math.floor(Math.random() * tileCount),
+                        y: Math.floor(Math.random() * tileCount)
+                    };
+                } while (
+                    snake.some(segment => segment.x === obstacle.x && segment.y === obstacle.y) ||
+                    (food.x === obstacle.x && food.y === obstacle.y) ||
+                    obstacles.some(obs => obs.x === obstacle.x && obs.y === obstacle.y)
+                );
+                obstacles.push(obstacle);
+            }
+        }
+
+        function drawGame() {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                score += 1;
+                scoreDisplay.textContent = `Score: ${score}`;
+                generateFood();
+                if (score % 15 === 0) {
+                    speed = Math.max(50, speed - 20);
+                    clearInterval(gameLoop);
+                    gameLoop = setInterval(drawGame, speed);
+                }
+                if (score % 30 === 0) {
+                    obstacleCount += 1;
+                    generateObstacles(obstacleCount);
+                }
+            } else {
+                snake.pop();
+            }
+
+            ctx.fillStyle = 'green';
+            snake.forEach(segment => {
+                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 2, gridSize - 2);
+            });
+
+            ctx.fillStyle = 'red';
+            ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+
+            ctx.fillStyle = 'gray';
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x * gridSize, obstacle.y * gridSize, gridSize - 2, gridSize - 2);
+            });
+
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                endGame();
+            }
+
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    endGame();
+                }
+            }
+
+            for (let obstacle of obstacles) {
+                if (head.x === obstacle.x && head.y === obstacle.y) {
+                    endGame();
+                }
+            }
+        }
+
+        function generateFood() {
+            food.x = Math.floor(Math.random() * tileCount);
+            food.y = Math.floor(Math.random() * tileCount);
+            if (
+                snake.some(segment => segment.x === food.x && segment.y === food.y) ||
+                obstacles.some(obstacle => obstacle.x === food.x && obstacle.y === food.y)
+            ) {
+                generateFood();
+            }
+        }
+
+        function endGame() {
+            clearInterval(gameLoop);
+            const finalTime = stopTimer();
+            finalScoreDisplay.textContent = score;
+            finalTimeDisplay.textContent = `${finalTime}s`;
+            gameOverScreen.style.display = 'block';
+        }
+
+        function restartGame() {
+            snake = [{ x: 15, y: 15 }];
+            food = { x: 20, y: 20 };
+            obstacles = [];
+            dx = 0;
+            dy = 0;
+            score = 0;
+            speed = 200;
+            obstacleCount = 3;
+            scoreDisplay.textContent = `Score: ${score}`;
+            timerDisplay.textContent = `Time: 0s`;
+            gameOverScreen.style.display = 'none';
+            generateObstacles(obstacleCount);
+            clearInterval(gameLoop);
+            gameLoop = setInterval(drawGame, speed);
+            startTimer();
+        }
+
+        document.addEventListener('keydown', e => {
+            switch (e.key) {
+                case 'ArrowUp':
+                    if (dy !== 1) { dx = 0; dy = -1; }
+                    break;
+                case 'ArrowDown':
+                    if (dy !== -1) { dx = 0; dy = 1; }
+                    break;
+                case 'ArrowLeft':
+                    if (dx !== 1) { dx = -1; dy = 0; }
+                    break;
+                case 'ArrowRight':
+                    if (dx !== -1) { dx = 1; dy = 0; }
+                    break;
+            }
+        });
+
+        // Initialize game
+        generateObstacles(obstacleCount);
+        startTimer();
+        gameLoop = setInterval(drawGame, speed);
+    </script>
+</body>
+</html>
